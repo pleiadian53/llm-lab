@@ -1,0 +1,1223 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{5}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={blue},
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Memory Mechanisms in Neural Sequence Models}
+\author{LLM Lab}
+\date{}
+
+\begin{document}
+\maketitle
+
+{
+\setcounter{tocdepth}{3}
+\tableofcontents
+}
+\section{Memory Mechanisms in Neural Sequence Models: From RNNs to
+State-of-the-Art
+Architectures}\label{memory-mechanisms-in-neural-sequence-models-from-rnns-to-state-of-the-art-architectures}
+
+This document traces the evolution of memory mechanisms in neural
+sequence models, from early recurrent architectures to modern
+state-space models and hybrid systems as of late 2025.
+
+\textbf{Coverage:}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Recurrent Neural Networks (RNNs) and the vanishing gradient problem
+\item
+  LSTM and GRU: Gated memory mechanisms
+\item
+  Convolutional Neural Networks: Implicit memory through receptive
+  fields
+\item
+  Transformers: Attention as memory
+\item
+  State Space Models (S4): Continuous-time memory
+\item
+  Selective SSMs (Mamba, Mamba-2): Input-dependent memory
+\item
+  Memory-augmented Transformers and hybrid approaches (2024-2025)
+\item
+  Retrieval-Augmented Generation: External memory systems
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{1. Recurrent Neural Networks: The Foundation of Sequential
+Memory}\label{recurrent-neural-networks-the-foundation-of-sequential-memory}
+
+\subsubsection{1.1 The Basic RNN Memory
+Cell}\label{the-basic-rnn-memory-cell}
+
+The vanilla RNN maintains a \textbf{hidden state} \(h_t\) that serves as
+memory across time steps:
+
+\[
+h_t = \tanh(W_{hh} h_{t-1} + W_{xh} x_t + b_h)
+\]
+
+\[
+y_t = W_{hy} h_t + b_y
+\]
+
+where: - \(h_t \in \mathbb{R}^d\) is the hidden state (memory) -
+\(x_t \in \mathbb{R}^{d_x}\) is the input at time \(t\) -
+\(y_t \in \mathbb{R}^{d_y}\) is the output
+
+\textbf{Key insight}: The hidden state \(h_t\) is a function of all
+previous inputs \(x_1, \ldots, x_t\), creating a compressed
+representation of the sequence history.
+
+\subsubsection{1.2 Backpropagation Through Time
+(BPTT)}\label{backpropagation-through-time-bptt}
+
+Training RNNs requires unrolling the network through time and computing
+gradients:
+
+\[
+\frac{\partial \mathcal{L}}{\partial W_{hh}} = \sum_{t=1}^{T} \frac{\partial \mathcal{L}_t}{\partial W_{hh}}
+\]
+
+The gradient at time \(t\) depends on all future time steps through the
+chain rule:
+
+\[
+\frac{\partial h_t}{\partial h_k} = \prod_{i=k+1}^{t} \frac{\partial h_i}{\partial h_{i-1}} = \prod_{i=k+1}^{t} W_{hh}^\top \text{diag}(\tanh'(z_i))
+\]
+
+\subsubsection{1.3 The Vanishing Gradient
+Problem}\label{the-vanishing-gradient-problem}
+
+When \(t - k\) is large, this product of Jacobians either:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Vanishes}: \(\|W_{hh}\| < 1\) and \(|\tanh'(z)| < 1\) →
+  gradient \(\to 0\)
+\item
+  \textbf{Explodes}: \(\|W_{hh}\| > 1\) → gradient \(\to \infty\)
+\end{itemize}
+
+\textbf{Consequence}: Vanilla RNNs cannot learn long-term dependencies
+beyond \textasciitilde10-20 time steps.
+
+\begin{quote}
+\textbf{Memory limitation}: RNNs theoretically have infinite memory
+capacity, but in practice can only remember information from recent time
+steps due to vanishing gradients.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{2. LSTM and GRU: Gated Memory
+Mechanisms}\label{lstm-and-gru-gated-memory-mechanisms}
+
+\subsubsection{2.1 Long Short-Term Memory
+(LSTM)}\label{long-short-term-memory-lstm}
+
+LSTM (Hochreiter \& Schmidhuber, 1997) introduces a \textbf{cell state}
+\(c_t\) as explicit long-term memory, separate from the hidden state
+\(h_t\):
+
+\[
+\begin{aligned}
+f_t &= \sigma(W_f [h_{t-1}, x_t] + b_f) \quad &\text{(forget gate)} \\
+i_t &= \sigma(W_i [h_{t-1}, x_t] + b_i) \quad &\text{(input gate)} \\
+\tilde{c}_t &= \tanh(W_c [h_{t-1}, x_t] + b_c) \quad &\text{(candidate values)} \\
+c_t &= f_t \odot c_{t-1} + i_t \odot \tilde{c}_t \quad &\text{(cell state update)} \\
+o_t &= \sigma(W_o [h_{t-1}, x_t] + b_o) \quad &\text{(output gate)} \\
+h_t &= o_t \odot \tanh(c_t) \quad &\text{(hidden state)}
+\end{aligned}
+\]
+
+\textbf{Key innovation}: The cell state \(c_t\) has an \textbf{additive}
+update path:
+
+\[
+\frac{\partial c_t}{\partial c_{t-1}} = f_t
+\]
+
+This allows gradients to flow backward without repeated multiplication,
+solving the vanishing gradient problem.
+
+\subsubsection{2.2 Memory Mechanisms in
+LSTM}\label{memory-mechanisms-in-lstm}
+
+The LSTM has two types of memory:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Long-term memory}: Cell state \(c_t\)
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Controlled by forget gate \(f_t\) (what to remove)
+  \item
+    Controlled by input gate \(i_t\) (what to add)
+  \item
+    Can preserve information over hundreds of time steps
+  \end{itemize}
+\item
+  \textbf{Short-term memory}: Hidden state \(h_t\)
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Filtered version of cell state via output gate \(o_t\)
+  \item
+    Used for predictions and passed to next time step
+  \end{itemize}
+\end{enumerate}
+
+\subsubsection{2.3 Gated Recurrent Unit
+(GRU)}\label{gated-recurrent-unit-gru}
+
+GRU (Cho et al., 2014) simplifies LSTM by merging cell and hidden
+states:
+
+\[
+\begin{aligned}
+z_t &= \sigma(W_z [h_{t-1}, x_t]) \quad &\text{(update gate)} \\
+r_t &= \sigma(W_r [h_{t-1}, x_t]) \quad &\text{(reset gate)} \\
+\tilde{h}_t &= \tanh(W_h [r_t \odot h_{t-1}, x_t]) \quad &\text{(candidate hidden state)} \\
+h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \quad &\text{(hidden state)}
+\end{aligned}
+\]
+
+\textbf{Trade-off}: Fewer parameters (faster training) but slightly less
+expressive than LSTM.
+
+\begin{quote}
+\textbf{Memory capacity}: LSTMs/GRUs can maintain information over
+100-200 time steps, but still struggle with very long sequences (1000+
+steps) due to the sequential nature of computation.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{3. Convolutional Neural Networks: Implicit Memory via
+Receptive
+Fields}\label{convolutional-neural-networks-implicit-memory-via-receptive-fields}
+
+\subsubsection{3.1 CNNs for Sequence
+Modeling}\label{cnns-for-sequence-modeling}
+
+While CNNs are primarily associated with spatial data, they can model
+sequences through 1D convolutions:
+
+\[
+y_t = \sum_{k=0}^{K-1} w_k \cdot x_{t-k}
+\]
+
+where \(K\) is the kernel size.
+
+\subsubsection{3.2 Receptive Field as
+Memory}\label{receptive-field-as-memory}
+
+The \textbf{receptive field} determines how far back in the sequence a
+given output can ``see'':
+
+\begin{itemize}
+\tightlist
+\item
+  Single layer with kernel size \(K\): receptive field = \(K\)
+\item
+  \(L\) layers with kernel size \(K\): receptive field
+  \(\approx K \cdot L\)
+\item
+  With dilated convolutions: receptive field grows exponentially
+\end{itemize}
+
+\textbf{Memory characteristics}: - \textbf{Fixed, hierarchical memory}:
+Each layer aggregates information from a fixed window - \textbf{Parallel
+computation}: Unlike RNNs, all positions computed simultaneously -
+\textbf{Limited long-range dependencies}: Requires many layers for long
+sequences
+
+\subsubsection{3.3 WaveNet and Dilated
+Convolutions}\label{wavenet-and-dilated-convolutions}
+
+WaveNet (van den Oord et al., 2016) uses dilated convolutions to expand
+receptive fields exponentially:
+
+\[
+y_t = \sum_{k=0}^{K-1} w_k \cdot x_{t - d \cdot k}
+\]
+
+where \(d\) is the dilation factor (e.g., \(d = 1, 2, 4, 8, \ldots\)).
+
+With \(L\) layers and dilation doubling each layer, receptive field =
+\(2^L \cdot K\).
+
+\begin{quote}
+\textbf{Memory limitation}: CNNs have fixed, finite memory determined by
+architecture. Cannot adapt memory based on input content.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{4. Transformers: Attention as Associative
+Memory}\label{transformers-attention-as-associative-memory}
+
+\subsubsection{4.1 Self-Attention
+Mechanism}\label{self-attention-mechanism}
+
+Transformers (Vaswani et al., 2017) replace recurrence with
+\textbf{attention}, which can be viewed as a form of
+\textbf{content-addressable memory}:
+
+\[
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+\]
+
+where: - \(Q = XW_Q\) (queries: ``what am I looking for?'') -
+\(K = XW_K\) (keys: ``what do I contain?'') - \(V = XW_V\) (values:
+``what information do I provide?'')
+
+\subsubsection{4.2 Attention as Memory
+Retrieval}\label{attention-as-memory-retrieval}
+
+The attention mechanism can be interpreted as:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Memory storage}: Keys \(K\) and values \(V\) store information
+  from all positions
+\item
+  \textbf{Memory addressing}: Query \(Q_i\) computes similarity with all
+  keys
+\item
+  \textbf{Memory retrieval}: Weighted sum of values based on similarity
+\end{enumerate}
+
+This is analogous to \textbf{Hopfield networks} (Ramsauer et al., 2020),
+where:
+
+\[
+\text{Attention}(Q, K, V) \approx \text{HopfieldUpdate}(Q, K, V)
+\]
+
+\subsubsection{4.3 Multi-Head Attention: Multiple Memory
+Systems}\label{multi-head-attention-multiple-memory-systems}
+
+Multi-head attention creates multiple parallel memory systems:
+
+\[
+\text{MHA}(X) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h) W_O
+\]
+
+Each head can specialize in different types of relationships: -
+Syntactic dependencies - Semantic relationships - Positional patterns -
+Co-reference resolution
+
+\subsubsection{4.4 The KV Cache: Explicit Memory
+Storage}\label{the-kv-cache-explicit-memory-storage}
+
+During autoregressive generation, Transformers cache key-value pairs to
+avoid recomputation:
+
+\[
+\text{KV-Cache}_t = \{(K_1, V_1), (K_2, V_2), \ldots, (K_t, V_t)\}
+\]
+
+\textbf{Memory characteristics}: - \textbf{Size}:
+\(O(N \cdot d \cdot L)\) where \(N\) is sequence length, \(d\) is
+dimension, \(L\) is layers - \textbf{Growth}: Linear in sequence length
+- \textbf{Bottleneck}: Becomes memory-intensive for long sequences
+(\textgreater100k tokens)
+
+\subsubsection{4.5 Positional Encodings: Temporal
+Memory}\label{positional-encodings-temporal-memory}
+
+Since attention is permutation-invariant, position information is added:
+
+\textbf{Sinusoidal encodings} (original Transformer):
+
+\[
+\text{PE}_{(pos, 2i)} = \sin\left(\frac{pos}{10000^{2i/d}}\right), \quad
+\text{PE}_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)
+\]
+
+\textbf{Learned positional embeddings}: Directly learned for each
+position (limited to training length)
+
+\textbf{Relative positional encodings} (Transformer-XL, T5): Encode
+relative distances rather than absolute positions
+
+\textbf{Rotary Position Embeddings (RoPE)} (Su et al., 2021): Rotate
+query and key vectors based on position:
+
+\[
+q_m = R_m q, \quad k_n = R_n k
+\]
+
+where \(R_m\) is a rotation matrix depending on position \(m\).
+
+\begin{quote}
+\textbf{Memory capacity}: Transformers have \(O(N^2)\) memory complexity
+due to attention matrix. Can theoretically handle any sequence length
+but practically limited by quadratic cost.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{5. Efficient Transformers: Reducing Memory
+Complexity}\label{efficient-transformers-reducing-memory-complexity}
+
+\subsubsection{5.1 Sparse Attention
+Patterns}\label{sparse-attention-patterns}
+
+\textbf{Longformer} (Beltagy et al., 2020): Sliding window + global
+attention
+
+\[
+\text{Attention}_{\text{sparse}}(Q, K, V) = \text{softmax}\left(\frac{QK^\top + M}{\sqrt{d_k}}\right) V
+\]
+
+where \(M_{ij} = -\infty\) for disallowed connections.
+
+\textbf{BigBird} (Zaheer et al., 2020): Random + window + global
+attention
+
+Complexity: \(O(N \cdot w)\) where \(w\) is window size.
+
+\subsubsection{5.2 Low-Rank
+Approximations}\label{low-rank-approximations}
+
+\textbf{Linformer} (Wang et al., 2020): Project keys and values to lower
+dimension:
+
+\[
+\text{Attention}(Q, K, V) \approx \text{softmax}\left(\frac{Q(E_K K)^\top}{\sqrt{d_k}}\right) (E_V V)
+\]
+
+where \(E_K, E_V \in \mathbb{R}^{N \times k}\), \(k \ll N\).
+
+Complexity: \(O(N \cdot k)\)
+
+\subsubsection{5.3 Kernelized Attention}\label{kernelized-attention}
+
+\textbf{Performer} (Choromanski et al., 2020): Use kernel approximation:
+
+\[
+\text{softmax}(QK^\top) \approx \phi(Q) \phi(K)^\top
+\]
+
+where \(\phi\) is a feature map. This allows:
+
+\[
+\text{Attention}(Q, K, V) = \frac{\phi(Q)(\phi(K)^\top V)}{\phi(Q)(\phi(K)^\top \mathbf{1})}
+\]
+
+Complexity: \(O(N \cdot d)\) (linear in sequence length!)
+
+\subsubsection{5.4 Memory-Efficient KV Cache Optimization
+(2024-2025)}\label{memory-efficient-kv-cache-optimization-2024-2025}
+
+Recent advances focus on compressing the KV cache:
+
+\textbf{Multi-Query Attention (MQA)}: Share keys and values across heads
+- Reduces KV cache by factor of \(h\) (number of heads) - Used in PaLM,
+Falcon
+
+\textbf{Grouped-Query Attention (GQA)}: Compromise between MHA and MQA -
+Group heads to share KV pairs - Used in Llama-2, Mistral
+
+\textbf{KV Cache Quantization}: Store keys/values in lower precision
+(INT8, INT4) - 2-4× memory reduction with minimal quality loss
+
+\textbf{Selective KV Eviction}: Dynamically remove less important KV
+pairs - H₂O (Zhang et al., 2024): Keep heavy hitters (high attention
+scores) - FastGen (Microsoft, 2024): Profile-guided cache compression
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{6. State Space Models: Continuous-Time
+Memory}\label{state-space-models-continuous-time-memory}
+
+\subsubsection{6.1 Linear State Space
+Models}\label{linear-state-space-models}
+
+SSMs model sequences as continuous-time dynamical systems:
+
+\[
+\frac{dh(t)}{dt} = A h(t) + B u(t), \quad y(t) = C h(t) + D u(t)
+\]
+
+where: - \(h(t) \in \mathbb{R}^N\) is the continuous hidden state
+(memory) - \(u(t)\) is the input signal - \(y(t)\) is the output signal
+- \(A, B, C, D\) are learned parameters
+
+\subsubsection{6.2 Discretization for
+Sequences}\label{discretization-for-sequences}
+
+For discrete sequences \(x_t\), discretize with step size \(\Delta\):
+
+\[
+h_t = \bar{A} h_{t-1} + \bar{B} x_t, \quad y_t = C h_t
+\]
+
+where \(\bar{A} = \exp(\Delta A)\) and
+\(\bar{B} = (\Delta A)^{-1}(\exp(\Delta A) - I) \Delta B\).
+
+\subsubsection{6.3 Convolution View: Memory as Impulse
+Response}\label{convolution-view-memory-as-impulse-response}
+
+Unrolling the recurrence gives:
+
+\[
+y_t = \sum_{\tau=0}^{t} K_\tau x_{t-\tau}
+\]
+
+where \(K_\tau = C \bar{A}^\tau \bar{B}\) is the \textbf{impulse
+response kernel}.
+
+This shows SSMs are equivalent to \textbf{convolutions with structured
+kernels}.
+
+\subsubsection{6.4 S4: Structured State
+Spaces}\label{s4-structured-state-spaces}
+
+S4 (Gu et al., 2021) makes SSMs practical for long sequences:
+
+\textbf{Key innovations}:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{HiPPO initialization}: Initialize \(A\) to preserve
+  information over long horizons
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Based on Legendre polynomials
+  \item
+    Ensures stable long-range memory
+  \end{itemize}
+\item
+  \textbf{Structured \(A\) matrix}: Diagonal + low-rank structure
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Enables efficient computation via FFT
+  \item
+    \(O(N \log N)\) complexity
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Memory characteristics}: - \textbf{Fixed memory}:
+\(h_t \in \mathbb{R}^N\) with fixed dimension \(N\) - \textbf{Implicit
+long-range dependencies}: Through structured convolution kernel -
+\textbf{Linear/log-linear complexity}: Much more efficient than
+attention
+
+\begin{quote}
+\textbf{Limitation}: S4 uses fixed \(A, B, C\) for entire sequence.
+Cannot adapt based on content.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{7. Selective State Space Models: Input-Dependent
+Memory}\label{selective-state-space-models-input-dependent-memory}
+
+\subsubsection{7.1 Mamba: Selective SSMs}\label{mamba-selective-ssms}
+
+Mamba (Gu \& Dao, 2023) makes SSM parameters \textbf{input-dependent}:
+
+\[
+h_t = A(x_t) h_{t-1} + B(x_t) x_t, \quad y_t = C(x_t)^\top h_t
+\]
+
+where \(A(x_t), B(x_t), C(x_t)\) are functions of the input:
+
+\[
+\begin{aligned}
+B_t &= \text{Linear}_B(x_t) \\
+C_t &= \text{Linear}_C(x_t) \\
+\Delta_t &= \text{Softplus}(\text{Linear}_\Delta(x_t)) \\
+\bar{A}_t &= \exp(\Delta_t A) \\
+\bar{B}_t &= \Delta_t B_t
+\end{aligned}
+\]
+
+\subsubsection{7.2 Selective Memory: Content-Aware
+Filtering}\label{selective-memory-content-aware-filtering}
+
+The input-dependent parameters enable \textbf{selective memory}:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Small \(\Delta_t\)}: Ignore current input, rely on previous
+  state (memory)
+\item
+  \textbf{Large \(\Delta_t\)}: Focus on current input, update memory
+  significantly
+\end{itemize}
+
+This solves two key tasks that fixed SSMs fail at:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Selective copying}: Copy only relevant tokens
+\item
+  \textbf{Induction heads}: Recall patterns from history
+\end{enumerate}
+
+\subsubsection{7.3 Hardware-Efficient
+Implementation}\label{hardware-efficient-implementation}
+
+Mamba uses a \textbf{selective scan} kernel that fuses operations:
+
+\begin{verbatim}
+for t in range(T):
+    h[t] = A[t] * h[t-1] + B[t] * x[t]
+    y[t] = C[t] @ h[t]
+\end{verbatim}
+
+This avoids materializing the full hidden state sequence, enabling: -
+\textbf{Linear memory}: \(O(N)\) instead of \(O(N^2)\) - \textbf{Fast
+inference}: 5× faster than Transformer for long sequences - \textbf{Long
+context}: Handles 1M+ tokens efficiently
+
+\subsubsection{7.4 Mamba-2: State Space
+Duality}\label{mamba-2-state-space-duality}
+
+Mamba-2 (Dao \& Gu, 2024) reveals a duality between:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Recurrent view}: Sequential computation for inference
+  \[h_t = A_t h_{t-1} + B_t x_t\]
+\item
+  \textbf{Parallel view}: Matrix multiplication for training
+  \[Y = \text{SSM}(X) = (I - \bar{A})^{-1} \bar{B} X\]
+\end{enumerate}
+
+This enables: - \textbf{Training}: Parallel computation like
+Transformers - \textbf{Inference}: Sequential computation like RNNs -
+\textbf{Best of both worlds}: Fast training AND fast inference
+
+\begin{quote}
+\textbf{Memory characteristics}: Mamba maintains a compact hidden state
+\(h_t \in \mathbb{R}^N\) (typically \(N \approx 16\)) that compresses
+the entire sequence history. The selectivity mechanism allows it to
+dynamically decide what to remember and what to forget.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{8. Hybrid Memory Architectures
+(2024-2025)}\label{hybrid-memory-architectures-2024-2025}
+
+\subsubsection{8.1 Transformer + SSM
+Hybrids}\label{transformer-ssm-hybrids}
+
+Modern architectures combine multiple memory mechanisms:
+
+\textbf{Jamba} (AI21 Labs, 2024): Interleaves Transformer and Mamba
+blocks
+
+\[
+\text{Block}_\ell(x) = \begin{cases}
+\text{TransformerBlock}_\ell(x) & \ell \in \mathcal{T} \\
+\text{MambaBlock}_\ell(x) & \ell \in \mathcal{M}
+\end{cases}
+\]
+
+\begin{itemize}
+\tightlist
+\item
+  Transformers: Content-based retrieval, precise pattern matching
+\item
+  Mamba: Efficient long-range memory, streaming capability
+\item
+  MoE: Scale parameters without scaling compute
+\end{itemize}
+
+\textbf{StripedHyena} (Together AI, 2024): Hyena convolutions +
+attention
+
+\textbf{Zamba} (Zyphra, 2024): Mamba + shared attention layers
+
+\subsubsection{8.2 Memory-Augmented
+Transformers}\label{memory-augmented-transformers}
+
+Recent work extends Transformers with explicit memory modules:
+
+\textbf{Transformer-XL} (Dai et al., 2019): Segment-level recurrence -
+Cache KV pairs from previous segments - Relative positional encodings -
+Extends context to \textasciitilde1000 tokens
+
+\textbf{Compressive Transformer} (Rae et al., 2019): Hierarchical memory
+- Recent memory: Full KV cache - Compressed memory: Compressed older
+states - Extends context by 38\%
+
+\textbf{MemoryLLM} (Wang et al., 2024): Learnable memory management -
+Write gate: Decides what to store - Compression on eviction: Compress
+old memories - Neural router: Retrieves top-k relevant memories -
+Handles \textasciitilde20k tokens with constant compute
+
+\textbf{M+} (Wang et al., 2025): Hierarchical memory system - Working
+memory: Small on-GPU cache - Long-term memory: Large CPU-resident bank -
+Co-trained retriever and scheduler - Handles \textgreater160k tokens
+with \textless3\% overhead
+
+\subsubsection{8.3 Adaptive Context
+Extension}\label{adaptive-context-extension}
+
+\textbf{ABC (Attention with Bounded-Memory Control)} (Peng et al.,
+2021): - Learned control strategies for token retention - Dynamic memory
+budget allocation
+
+\textbf{TransformerFAM} (Hwang et al., 2024): - Feedback attention loops
+- Sustained activations across unlimited contexts
+
+\textbf{ATLAS} (Behrouz et al., 2025): - Sliding window with memory
+mechanisms - Omega rule for memory consolidation - Super-linear memory
+capacity
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{9. Retrieval-Augmented Generation: External
+Memory}\label{retrieval-augmented-generation-external-memory}
+
+\subsubsection{9.1 RAG Architecture}\label{rag-architecture}
+
+RAG (Lewis et al., 2020) augments LLMs with external knowledge
+retrieval:
+
+\[
+p(y|x) = \sum_{d \in \text{Top-k}(x)} p(d|x) \cdot p(y|x, d)
+\]
+
+where: - \(x\) is the input query - \(d\) are retrieved documents -
+\(y\) is the generated output
+
+\textbf{Components}:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Retriever}: Dense retrieval (e.g., DPR, Contriever)
+  \[\text{score}(q, d) = \text{Encoder}_q(q)^\top \text{Encoder}_d(d)\]
+\item
+  \textbf{Generator}: LLM conditioned on retrieved context
+  \[y = \text{LLM}(\text{concat}(x, d_1, \ldots, d_k))\]
+\end{enumerate}
+
+\subsubsection{9.2 Memory Characteristics of
+RAG}\label{memory-characteristics-of-rag}
+
+\textbf{External memory}: - \textbf{Capacity}: Virtually unlimited
+(entire corpus) - \textbf{Persistence}: Survives across sessions -
+\textbf{Updateability}: Can update knowledge base without retraining
+
+\textbf{Retrieval as memory access}: - \textbf{Associative}:
+Content-based retrieval like attention - \textbf{Selective}: Only
+retrieve relevant information - \textbf{Scalable}: Sublinear search with
+approximate nearest neighbors
+
+\subsubsection{9.3 Advanced RAG Techniques
+(2024-2025)}\label{advanced-rag-techniques-2024-2025}
+
+\textbf{Dual-Pathway KG-RAG} (Xu et al., 2024): - Structured retrieval
+from knowledge graphs - Unstructured retrieval from text corpus -
+Reduces hallucinations by 20-30\%
+
+\textbf{Self-RAG} (Asai et al., 2023): - Model learns when to retrieve -
+Reflection tokens for quality control
+
+\textbf{CRAG (Corrective RAG)} (Yan et al., 2024): - Evaluates retrieval
+quality - Corrects or re-retrieves if needed
+
+\textbf{Agentic RAG} (2024-2025): - Multi-step reasoning with retrieval
+- Tool use for structured queries - Iterative refinement
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{10. Comparative Analysis: Memory
+Mechanisms}\label{comparative-analysis-memory-mechanisms}
+
+\subsubsection{10.1 Memory Capacity}\label{memory-capacity}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Architecture & Memory Size & Effective Context & Complexity \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+RNN & \(O(d)\) & \textasciitilde10-20 steps & \(O(N \cdot d^2)\) \\
+LSTM/GRU & \(O(d)\) & \textasciitilde100-200 steps &
+\(O(N \cdot d^2)\) \\
+CNN & \(O(L \cdot K)\) & \(L \cdot K\) steps &
+\(O(N \cdot K \cdot d)\) \\
+Transformer & \(O(N \cdot d)\) & Full sequence & \(O(N^2 \cdot d)\) \\
+S4 & \(O(N_{\text{state}})\) & Full sequence & \(O(N \log N)\) \\
+Mamba & \(O(N_{\text{state}})\) & Full sequence & \(O(N \cdot d)\) \\
+RAG & \(O(\text{corpus})\) & Unlimited & \(O(N \cdot d + k \cdot d)\) \\
+\end{longtable}
+}
+
+\subsubsection{10.2 Memory Types}\label{memory-types}
+
+\textbf{Implicit memory} (RNN, LSTM, GRU, Mamba): - Compressed
+representation in hidden state - Information loss through compression -
+Efficient for long sequences
+
+\textbf{Explicit memory} (Transformer): - Full history stored in KV
+cache - No information loss (within context window) - Memory-intensive
+for long sequences
+
+\textbf{External memory} (RAG): - Separate knowledge base - Persistent
+across sessions - Requires retrieval mechanism
+
+\subsubsection{10.3 Memory Control}\label{memory-control}
+
+\textbf{Fixed memory} (RNN, CNN, S4): - Same memory mechanism for all
+inputs - Cannot adapt based on content - Simpler, more efficient
+
+\textbf{Adaptive memory} (LSTM, GRU, Mamba, Transformer): -
+Input-dependent memory operations - Can selectively remember/forget -
+More expressive, higher capacity
+
+\subsubsection{10.4 Temporal Dynamics}\label{temporal-dynamics}
+
+\textbf{Sequential} (RNN, LSTM, GRU, Mamba): - Process one token at a
+time - Natural for streaming/online settings - Slower training (not
+parallelizable)
+
+\textbf{Parallel} (CNN, Transformer, S4): - Process all tokens
+simultaneously - Fast training - May require special handling for
+inference
+
+\textbf{Dual-mode} (Mamba-2, RWKV): - Parallel for training - Sequential
+for inference - Best of both worlds
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{11. Memory in Modern LLMs (Late
+2025)}\label{memory-in-modern-llms-late-2025}
+
+\subsubsection{11.1 Extended Context
+Windows}\label{extended-context-windows}
+
+Recent models push context limits:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{GPT-4 Turbo}: 128k tokens
+\item
+  \textbf{Claude 3}: 200k tokens
+\item
+  \textbf{Gemini 1.5 Pro}: 1M tokens (experimental: 10M)
+\item
+  \textbf{Jamba}: 256k tokens (hybrid Transformer-Mamba)
+\end{itemize}
+
+\textbf{Techniques}: - Grouped-query attention (GQA) - KV cache
+quantization - Sparse attention patterns - Hybrid architectures
+(Transformer + SSM)
+
+\subsubsection{11.2 Infinite Context via
+Compression}\label{infinite-context-via-compression}
+
+\textbf{Compression-based approaches}:
+
+\textbf{R³mem} (Wang et al., 2025): - Reversible compression
+architecture - Hierarchical chunking (paragraph → sentence →
+sub-sentence) - Bidirectional transformation (compress ↔ decompress) -
+Maintains semantic coherence
+
+\textbf{Memorizing Transformers} (Wu et al., 2022): - kNN-augmented
+attention - Retrieve from compressed past - Effectively infinite context
+
+\subsubsection{11.3 Streaming and Online
+Learning}\label{streaming-and-online-learning}
+
+\textbf{Streaming models} (Mamba, RWKV): - Constant memory regardless of
+sequence length - Process tokens one at a time - Suitable for real-time
+applications
+
+\textbf{Online learning}: - Update model during inference - Adapt to
+user-specific patterns - Requires efficient memory updates
+
+\subsubsection{11.4 Multi-Modal Memory}\label{multi-modal-memory}
+
+\textbf{Cross-modal memory}: - Unified memory for text, images, audio,
+video - Shared attention mechanisms - Examples: GPT-4V, Gemini, Claude 3
+
+\textbf{Persistent memory across modalities}: - Remember visual context
+in text generation - Recall textual information for image understanding
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{12. Future Directions and Open
+Problems}\label{future-directions-and-open-problems}
+
+\subsubsection{12.1 Biological
+Inspiration}\label{biological-inspiration}
+
+\textbf{Hippocampal memory systems}: - Fast encoding in hippocampus -
+Slow consolidation in neocortex - Replay mechanisms for memory
+consolidation
+
+\textbf{Working memory vs.~long-term memory}: - Separate systems with
+different characteristics - Transfer mechanisms between systems -
+Forgetting as a feature, not a bug
+
+\subsubsection{12.2 Efficient Long-Context
+Modeling}\label{efficient-long-context-modeling}
+
+\textbf{Challenges}: - Quadratic attention cost - KV cache memory
+bottleneck - Quality degradation at extreme lengths
+
+\textbf{Promising directions}: - Hybrid architectures (attention + SSM +
+convolution) - Hierarchical memory systems - Learned compression and
+retrieval - Hardware co-design (custom kernels, memory hierarchies)
+
+\subsubsection{12.3 Adaptive and Lifelong
+Learning}\label{adaptive-and-lifelong-learning}
+
+\textbf{Continual learning}: - Learn new information without forgetting
+- Catastrophic forgetting problem - Memory consolidation strategies
+
+\textbf{Meta-learning for memory}: - Learn how to remember - Adaptive
+memory allocation - Task-specific memory strategies
+
+\subsubsection{12.4 Interpretable Memory}\label{interpretable-memory}
+
+\textbf{Understanding what is remembered}: - Attention visualization
+(limited) - Probing hidden states - Causal intervention studies
+
+\textbf{Controlling memory}: - Explicit forget mechanisms -
+Privacy-preserving memory - Selective memory editing
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{13. Practical
+Considerations}\label{practical-considerations}
+
+\subsubsection{13.1 Memory-Compute
+Trade-offs}\label{memory-compute-trade-offs}
+
+\textbf{Training}: - Transformers: High memory, parallelizable -
+RNNs/SSMs: Lower memory, sequential - Hybrid: Balanced approach
+
+\textbf{Inference}: - Transformers: KV cache grows with sequence - SSMs:
+Constant memory - RAG: External memory, retrieval cost
+
+\subsubsection{13.2 Implementation Tips}\label{implementation-tips}
+
+\textbf{For long sequences}: 1. Use gradient checkpointing to reduce
+memory 2. Consider hybrid architectures (Mamba + attention) 3. Implement
+KV cache optimization (quantization, eviction) 4. Use efficient
+attention variants (FlashAttention, xFormers)
+
+\textbf{For streaming applications}: 1. Prefer recurrent architectures
+(LSTM, Mamba, RWKV) 2. Implement sliding window attention 3. Use
+chunk-wise processing 4. Consider online learning capabilities
+
+\textbf{For memory-constrained settings}: 1. Use smaller models with
+better architectures 2. Quantize weights and activations 3. Implement
+memory-efficient attention 4. Consider distillation from larger models
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{14. Conclusion}\label{conclusion}
+
+Memory mechanisms in neural sequence models have evolved dramatically:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{RNNs} (1980s-1990s): First sequential memory, but limited by
+  vanishing gradients
+\item
+  \textbf{LSTMs/GRUs} (1997-2014): Gated memory solves vanishing
+  gradients, enables \textasciitilde100-step memory
+\item
+  \textbf{CNNs} (2016): Parallel processing with fixed receptive fields
+\item
+  \textbf{Transformers} (2017): Attention as content-addressable memory,
+  \(O(N^2)\) cost
+\item
+  \textbf{Efficient Transformers} (2020-2021): Sparse, low-rank,
+  kernelized attention
+\item
+  \textbf{State Space Models} (2021-2022): S4 brings continuous-time
+  memory, \(O(N \log N)\) cost
+\item
+  \textbf{Selective SSMs} (2023-2024): Mamba adds input-dependent
+  memory, linear cost
+\item
+  \textbf{Hybrid Architectures} (2024-2025): Combine attention + SSM +
+  MoE for optimal trade-offs
+\item
+  \textbf{Memory-Augmented Systems} (2024-2025): Hierarchical memory,
+  compression, retrieval
+\end{enumerate}
+
+\textbf{Key insights}:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{No single best memory mechanism}: Different tasks and
+  constraints favor different approaches
+\item
+  \textbf{Hybrid is the future}: Combining multiple memory types
+  (attention + SSM + external) gives best results
+\item
+  \textbf{Efficiency matters}: Linear/log-linear complexity enables
+  million-token contexts
+\item
+  \textbf{Adaptivity is crucial}: Input-dependent memory (gates,
+  selective SSMs) outperforms fixed mechanisms
+\item
+  \textbf{External memory scales}: RAG and retrieval-augmented
+  approaches provide unlimited memory capacity
+\end{itemize}
+
+As of late 2025, the field is converging on \textbf{hybrid
+architectures} that combine: - \textbf{Attention} for precise,
+content-based retrieval - \textbf{SSMs} for efficient long-range memory
+- \textbf{External retrieval} for unlimited knowledge access -
+\textbf{Adaptive mechanisms} for content-aware processing
+
+The next frontier involves biological inspiration, continual learning,
+and interpretable memory systems that can explain what they remember and
+why.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{References}\label{references}
+
+\subsubsection{Foundational Papers}\label{foundational-papers}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Hochreiter, S., \& Schmidhuber, J. (1997). Long short-term memory.
+  Neural computation, 9(8), 1735-1780.
+\item
+  Cho, K., et al.~(2014). Learning phrase representations using RNN
+  encoder-decoder for statistical machine translation. EMNLP.
+\item
+  Vaswani, A., et al.~(2017). Attention is all you need. NeurIPS.
+\item
+  van den Oord, A., et al.~(2016). WaveNet: A generative model for raw
+  audio. arXiv:1609.03499.
+\end{enumerate}
+
+\subsubsection{State Space Models}\label{state-space-models}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{4}
+\tightlist
+\item
+  Gu, A., Goel, K., \& Ré, C. (2021). Efficiently modeling long
+  sequences with structured state spaces. ICLR 2022.
+\item
+  Gu, A., \& Dao, T. (2023). Mamba: Linear-time sequence modeling with
+  selective state spaces. arXiv:2312.00752.
+\item
+  Dao, T., \& Gu, A. (2024). Transformers are SSMs: Generalized models
+  and efficient algorithms through structured state space duality. ICML
+  2024.
+\end{enumerate}
+
+\subsubsection{Efficient Transformers}\label{efficient-transformers}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{7}
+\tightlist
+\item
+  Beltagy, I., Peters, M. E., \& Cohan, A. (2020). Longformer: The
+  long-document transformer. arXiv:2004.05150.
+\item
+  Zaheer, M., et al.~(2020). Big bird: Transformers for longer
+  sequences. NeurIPS.
+\item
+  Wang, S., et al.~(2020). Linformer: Self-attention with linear
+  complexity. arXiv:2006.04768.
+\item
+  Choromanski, K., et al.~(2020). Rethinking attention with performers.
+  ICLR 2021.
+\end{enumerate}
+
+\subsubsection{Memory-Augmented
+Transformers}\label{memory-augmented-transformers-1}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{11}
+\tightlist
+\item
+  Dai, Z., et al.~(2019). Transformer-XL: Attentive language models
+  beyond a fixed-length context. ACL.
+\item
+  Rae, J. W., et al.~(2019). Compressive transformers for long-range
+  sequence modelling. ICLR 2020.
+\item
+  Wu, Y., et al.~(2022). Memorizing transformers. ICLR 2022.
+\item
+  Wang, Y., et al.~(2024). MemoryLLM: Towards self-updatable large
+  language models. arXiv:2402.04624.
+\item
+  Wang, Y., et al.~(2025). M+: Hierarchical memory for long-context
+  language models. arXiv:2501.xxxxx.
+\end{enumerate}
+
+\subsubsection{Hybrid Architectures}\label{hybrid-architectures}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{16}
+\tightlist
+\item
+  Lieber, O., et al.~(2024). Jamba: A hybrid transformer-mamba language
+  model. arXiv:2403.19887.
+\item
+  Poli, M., et al.~(2023). Hyena hierarchy: Towards larger convolutional
+  language models. ICML 2023.
+\item
+  Peng, B., et al.~(2023). RWKV: Reinventing RNNs for the transformer
+  era. EMNLP 2023.
+\end{enumerate}
+
+\subsubsection{Retrieval-Augmented
+Generation}\label{retrieval-augmented-generation}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{19}
+\tightlist
+\item
+  Lewis, P., et al.~(2020). Retrieval-augmented generation for
+  knowledge-intensive NLP tasks. NeurIPS.
+\item
+  Asai, A., et al.~(2023). Self-RAG: Learning to retrieve, generate, and
+  critique through self-reflection. arXiv:2310.11511.
+\item
+  Yan, S., et al.~(2024). Corrective retrieval augmented generation.
+  arXiv:2401.15884.
+\end{enumerate}
+
+\subsubsection{Recent Surveys
+(2024-2025)}\label{recent-surveys-2024-2025}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{22}
+\tightlist
+\item
+  Memory-Augmented Transformers: A Systematic Review from Neuroscience
+  Principles to Technical Solutions. arXiv:2508.10824, 2025.
+\item
+  A Comprehensive Survey of Retrieval-Augmented Generation.
+  arXiv:2506.00054, 2025.
+\item
+  KV Caching in LLM Inference: A Comprehensive Review. 2024-2025.
+\end{enumerate}
+
+\subsubsection{Implementation Resources}\label{implementation-resources}
+
+\begin{itemize}
+\tightlist
+\item
+  Mamba: https://github.com/state-spaces/mamba
+\item
+  FlashAttention: https://github.com/Dao-AILab/flash-attention
+\item
+  Transformer-XL: https://github.com/kimiyoung/transformer-xl
+\item
+  HuggingFace Transformers: https://github.com/huggingface/transformers
+\end{itemize}
+
+\end{document}

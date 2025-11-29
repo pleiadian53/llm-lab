@@ -1,0 +1,82 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+*.pyd
+
+# Packaging
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+env/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Editor project files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Warp AI configuration (personal)
+WARP.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Data and outputs
+data/
+outputs/
+checkpoints/
+logs/
+wandb/
+
+# Dev notes
+dev/
+
+# Local configs
+.env
+.env.*
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Cached binaries
+pip-wheel-metadata/
+pip-log.txt
+
+# LaTeX build artifacts
+*.aux
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+
+# Keep PDFs (they're documentation outputs)
+# But ignore intermediate LaTeX files
+
+# Misc
+*.tmp
+*.log
+*.bak
+*.orig
