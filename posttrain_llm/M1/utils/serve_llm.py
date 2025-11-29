@@ -74,11 +74,29 @@ class ServeLLM:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cleanup()
     
-    def load_model(self):
+    def load_model(self, max_retries=3):
         print(f"Loading model: {self.model_name}")
         print(f"Device: {self.device}, Quantization: {self.quantize or 'None'}")
         
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
+        # Retry logic for network issues
+        for attempt in range(max_retries):
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
+                break  # Success, exit retry loop
+            except Exception as e:
+                error_msg = str(e)
+                if "couldn't connect" in error_msg or "connection" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 10
+                        print(f"⚠️ Connection failed (attempt {attempt + 1}/{max_retries})")
+                        print(f"   Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"❌ Failed to load tokenizer after {max_retries} attempts")
+                        raise
+                else:
+                    # Non-connection error, raise immediately
+                    raise
         
         # Add padding token if not present
         if tokenizer.pad_token is None:
@@ -123,11 +141,28 @@ class ServeLLM:
         if self.device == "cuda":
             model_kwargs["device_map"] = "auto"
         
-        # Load model
-        model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            **model_kwargs
-        )
+        # Load model with retry logic
+        for attempt in range(max_retries):
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    **model_kwargs
+                )
+                break  # Success, exit retry loop
+            except Exception as e:
+                error_msg = str(e)
+                if "couldn't connect" in error_msg or "connection" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 10
+                        print(f"⚠️ Model download failed (attempt {attempt + 1}/{max_retries})")
+                        print(f"   Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"❌ Failed to load model after {max_retries} attempts")
+                        raise
+                else:
+                    # Non-connection error, raise immediately
+                    raise
         
         # Move to device if not using CUDA device_map or quantization
         if self.device != "cuda" and self.quantize is None:
@@ -137,6 +172,7 @@ class ServeLLM:
         model.eval()
         print("Model loaded successfully!")
         return model, tokenizer
+
     
     def generate_response(self, prompts, temperature=0.0, top_p=1.0, max_tokens=100):
         if isinstance(prompts, str):
@@ -239,4 +275,3 @@ if __name__ == "__main__":
         response = llm.generate_response(user_input, temperature=0.0, top_p=1.0, max_tokens=5000)
         print(f"Result: {response}")
     llm.cleanup()
-
