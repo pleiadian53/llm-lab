@@ -86,45 +86,78 @@ class ServeLLM:
             return "cpu"
         return device
     
-    def _load_model(self):
-        """Load the tokenizer and model."""
-        try:
-            print(f"Loading {self.model_name}...")
+    def _load_model(self, max_retries=3):
+        """Load the tokenizer and model with retry logic for network issues."""
+        import time
+        
+        print(f"Loading {self.model_name}...")
+        
+        # Load tokenizer with retry logic
+        for attempt in range(max_retries):
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name,
+                    trust_remote_code=True
+                )
+                break  # Success, exit retry loop
+            except Exception as e:
+                error_msg = str(e)
+                if "couldn't connect" in error_msg or "connection" in error_msg.lower() or "offline" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 10
+                        print(f"⚠️ Tokenizer download failed (attempt {attempt + 1}/{max_retries})")
+                        print(f"   Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"❌ Failed to load tokenizer after {max_retries} attempts")
+                        print(f"   Error: {error_msg}")
+                        raise
+                else:
+                    # Non-connection error, raise immediately
+                    print(f"❌ Error loading tokenizer: {error_msg}")
+                    raise
+        
+        # Add padding token if not present
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # Load model with retry logic
+        model_kwargs = {
+            "trust_remote_code": True,
+            "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
+        }
+        
+        if self.device == "cuda":
+            model_kwargs["device_map"] = "auto"
+        
+        for attempt in range(max_retries):
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    **model_kwargs
+                )
+                break  # Success, exit retry loop
+            except Exception as e:
+                error_msg = str(e)
+                if "couldn't connect" in error_msg or "connection" in error_msg.lower() or "offline" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 10
+                        print(f"⚠️ Model download failed (attempt {attempt + 1}/{max_retries})")
+                        print(f"   Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"❌ Failed to load model after {max_retries} attempts")
+                        print(f"   Error: {error_msg}")
+                        raise
+                else:
+                    # Non-connection error, raise immediately
+                    print(f"❌ Error loading model: {error_msg}")
+                    raise
+        
+        if self.device == "cpu":
+            self.model = self.model.to(self.device)
             
-            # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                trust_remote_code=True,
-                local_files_only=True
-            )
-            
-            # Add padding token if not present
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-            
-            # Load model with appropriate settings
-            model_kwargs = {
-                "trust_remote_code": True,
-                "dtype": torch.float16 if self.device == "cuda" else torch.float32,
-                "local_files_only": True
-            }
-            
-            if self.device == "cuda":
-                model_kwargs["device_map"] = "auto"
-            
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                **model_kwargs
-            )
-            
-            if self.device == "cpu":
-                self.model = self.model.to(self.device)
-                
-            print(f"✅ Model loaded successfully on {self.device}")
-            
-        except Exception as e:
-            print(f"❌ Error loading model: {e}")
-            raise
+        print(f"✅ Model loaded successfully on {self.device}")
     
     def generate_response(
         self, 
