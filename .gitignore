@@ -42,10 +42,8 @@ checkpoints/
 logs/
 wandb/
 
-# Dev notes (but keep colab setup docs)
-dev/*
-!dev/colab/
-!dev/Initial_setup/
+# Dev notes
+dev/
 
 # Local configs
 .env
