@@ -1,8 +1,13 @@
-# Colab Sync Script
+# Colab Sync Scripts
 
 ## Overview
 
-`sync_to_colab.py` syncs your local `llm-lab` project to Google Drive so it can be accessed from Google Colab in your hybrid cloud-local development environment.
+Two scripts for bidirectional sync between local machine and Google Drive/Colab:
+
+- **`sync_to_colab.py`** - Push local changes TO Google Drive (for Colab)
+- **`sync_from_colab.py`** - Pull Colab changes FROM Google Drive (to local)
+
+⚠️ **IMPORTANT**: Always pull before push to avoid losing work created in Colab!
 
 ## Quick Start
 
@@ -44,38 +49,67 @@
 - Compressed archives (`.gz`, `.tar`, `.zip`)
 - Build artifacts
 
-## Workflow
+## Bidirectional Workflow
 
-### 1. Local Development
+### Scenario 1: Local → Colab (Push)
+
+**When**: You made changes locally and want to use them in Colab
+
 ```bash
-# Work on your Mac as usual
+# 1. Work locally
 cd ~/work/llm-lab
-# Edit files, commit to git, etc.
-```
+# Edit files, commit to git
 
-### 2. Sync to Google Drive
-```bash
-# Sync changes to Drive
+# 2. Push to Drive
 ./scripts/sync_to_colab.py
 
-# Or with verbose output
-./scripts/sync_to_colab.py -v
+# 3. Use in Colab
+# Files are now available in Colab
 ```
 
-### 3. Access in Colab
-```python
-# In Colab notebook
-from google.colab import drive
-drive.mount('/content/drive')
+### Scenario 2: Colab → Local (Pull)
 
-# Navigate to project
-%cd /content/drive/MyDrive/work_MBP_M1/llm-lab
+**When**: You created/modified files in Colab and want them locally
 
-# Install your package
-!pip install -e posttrain_llm/llm_eval
+```bash
+# 1. After working in Colab, pull changes
+./scripts/sync_from_colab.py
 
-# Use it
-from llm_eval import ServeLLM
+# 2. Review what changed
+git status
+git diff
+
+# 3. Commit if desired
+git add .
+git commit -m "Work from Colab session"
+```
+
+### Scenario 3: Round-trip (Pull → Work → Push)
+
+**When**: You work in both environments
+
+```bash
+# 1. Pull Colab changes first (IMPORTANT!)
+./scripts/sync_from_colab.py
+
+# 2. Work locally
+# Edit files, test, commit
+
+# 3. Push back to Colab
+./scripts/sync_to_colab.py
+
+# 4. Continue in Colab with latest changes
+```
+
+### ⚠️ **CRITICAL: Avoid Data Loss**
+
+```bash
+# ❌ WRONG - Will delete Colab work!
+./scripts/sync_to_colab.py  # Without pulling first
+
+# ✅ CORRECT - Pull first, then push
+./scripts/sync_from_colab.py  # Get Colab changes
+./scripts/sync_to_colab.py    # Push local changes
 ```
 
 ## Important Notes

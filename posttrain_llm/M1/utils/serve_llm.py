@@ -78,6 +78,10 @@ class ServeLLM:
         print(f"Loading model: {self.model_name}")
         print(f"Device: {self.device}, Quantization: {self.quantize or 'None'}")
         
+        # Disable progress bars to avoid UI rendering issues in remote notebooks
+        import os
+        os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
+        
         # Retry logic for network issues
         for attempt in range(max_retries):
             try:
@@ -122,7 +126,7 @@ class ServeLLM:
             except ImportError:
                 print("Warning: bitsandbytes not installed. Install with: pip install bitsandbytes")
                 print("Falling back to non-quantized loading")
-                model_kwargs["torch_dtype"] = self.dtype
+                model_kwargs["dtype"] = self.dtype
         elif self.quantize == "8bit":
             try:
                 from transformers import BitsAndBytesConfig
@@ -133,9 +137,9 @@ class ServeLLM:
             except ImportError:
                 print("Warning: bitsandbytes not installed. Install with: pip install bitsandbytes")
                 print("Falling back to non-quantized loading")
-                model_kwargs["torch_dtype"] = self.dtype
+                model_kwargs["dtype"] = self.dtype
         else:
-            model_kwargs["torch_dtype"] = self.dtype
+            model_kwargs["dtype"] = self.dtype
         
         # Handle device mapping
         if self.device == "cuda":

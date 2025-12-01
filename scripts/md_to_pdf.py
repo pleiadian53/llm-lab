@@ -231,16 +231,16 @@ def main():
         epilog="""
 Examples:
   # Convert to PDF
-  python scripts/md_to_pdf_v2.py docs/llm/llm_tech_history.md
+  python scripts/md_to_pdf.py docs/llm/llm_tech_history.md
   
   # Specify output path
-  python scripts/md_to_pdf_v2.py docs/llm/llm_tech_history.md -o output/history.pdf
+  python scripts/md_to_pdf.py docs/llm/llm_tech_history.md -o output/history.pdf
   
   # Generate LaTeX only
-  python scripts/md_to_pdf_v2.py docs/llm/llm_tech_history.md --latex-only
+  python scripts/md_to_pdf.py docs/llm/llm_tech_history.md --latex-only
   
   # Custom title and author
-  python scripts/md_to_pdf_v2.py docs/llm/llm_tech_history.md \\
+  python scripts/md_to_pdf.py docs/llm/llm_tech_history.md \\
       --title "LLM History" --author "Your Name"
 
 Requirements:
