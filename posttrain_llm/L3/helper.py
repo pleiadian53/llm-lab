@@ -44,14 +44,44 @@ def test_model_with_questions(model, tokenizer, questions, system_message=None, 
         response = generate_responses(model, tokenizer, question, system_message)
         print(f"\nModel Input {i}:\n{question}\nModel Output {i}:\n{response}\n")
 
-def load_model_and_tokenizer(model_name, use_gpu = False):
+def load_model_and_tokenizer(model_name, use_gpu=False, device=None):
+    """
+    Load model and tokenizer with support for CUDA, MPS (Apple Silicon), and CPU.
     
+    Args:
+        model_name: HuggingFace model name or local path
+        use_gpu: If True, automatically select best available device (cuda > mps > cpu)
+        device: Explicit device string ('cuda', 'mps', 'cpu'). Overrides use_gpu.
+    
+    Returns:
+        model, tokenizer
+    """
     # Load base model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
     
-    if use_gpu:
-        model.to("cuda")
+    # Determine device
+    if device is not None:
+        # Explicit device specified
+        target_device = device
+    elif use_gpu:
+        # Auto-select best available device
+        if torch.cuda.is_available():
+            target_device = "cuda"
+            print(f"Using CUDA GPU: {torch.cuda.get_device_name(0)}")
+        elif torch.backends.mps.is_available():
+            target_device = "mps"
+            print("Using Apple Silicon GPU (MPS)")
+        else:
+            target_device = "cpu"
+            print("No GPU available, using CPU")
+    else:
+        target_device = "cpu"
+        print("Using CPU (use_gpu=False)")
+    
+    # Move model to device
+    model.to(target_device)
+    print(f"Model loaded on device: {target_device}")
     
     if not tokenizer.chat_template:
         tokenizer.chat_template = """{% for message in messages %}
