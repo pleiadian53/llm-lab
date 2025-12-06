@@ -66,6 +66,9 @@ dependencies:
       - transformers>=4.35
       - datasets>=2.15
       - accelerate>=0.20
+      - peft>=0.10.0          # Parameter-Efficient Fine-Tuning
+      - trl>=0.8.0            # Transformer Reinforcement Learning (SFTTrainer)
+      - bitsandbytes>=0.42.0  # QLoRA quantization
       
       # ========================================================================
       # Configuration Management (all projects)

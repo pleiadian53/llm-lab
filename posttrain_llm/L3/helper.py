@@ -56,6 +56,12 @@ def load_model_and_tokenizer(model_name, use_gpu=False, device=None):
     Returns:
         model, tokenizer
     """
+    # Convert relative paths to absolute paths for local models
+    import os
+    if model_name.startswith('./') or model_name.startswith('../'):
+        model_name = os.path.abspath(model_name)
+        print(f"Resolved local model path: {model_name}")
+    
     # Load base model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
