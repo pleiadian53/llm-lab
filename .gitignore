@@ -80,3 +80,4 @@ pip-log.txt
 *.log
 *.bak
 *.orig
+posttrain_llm/L3/trainer_output/
