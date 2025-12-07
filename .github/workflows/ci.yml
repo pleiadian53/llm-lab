@@ -11,20 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up micromamba
-        uses: mamba-org/provision-with-micromamba@v16
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           environment-name: llm-lab
-          cache-downloads: true
+          cache-environment: true
+          init-shell: bash
       - name: Install project (editable)
-        shell: bash -l {0}
-        run: |
-          micromamba activate llm-lab
-          pip install -e .[dev]
+        shell: micromamba-shell {0}
+        run: pip install -e .[dev]
       - name: Run linters
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
-          micromamba activate llm-lab
           ruff check src tests
           ruff format --check src tests
           mypy src
@@ -35,18 +33,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up micromamba
-        uses: mamba-org/provision-with-micromamba@v16
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           environment-name: llm-lab
-          cache-downloads: true
+          cache-environment: true
+          init-shell: bash
       - name: Install project (editable)
-        shell: bash -l {0}
-        run: |
-          micromamba activate llm-lab
-          pip install -e .[dev]
+        shell: micromamba-shell {0}
+        run: pip install -e .[dev]
       - name: Pytest
-        shell: bash -l {0}
-        run: |
-          micromamba activate llm-lab
-          pytest --maxfail=1 --disable-warnings --cov=llm_lab --cov-report=xml
+        shell: micromamba-shell {0}
+        run: pytest --maxfail=1 --disable-warnings --cov=llm_lab --cov-report=xml
