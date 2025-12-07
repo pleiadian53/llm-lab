@@ -3,19 +3,25 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class PreferenceDatasetConfig(BaseModel):
     """Preference data specification."""
 
-    dataset_name: str = Field("Anthropic/hh-rlhf", description="Preference dataset name.")
+    dataset_name: str = Field(
+        "Anthropic/hh-rlhf", description="Preference dataset name."
+    )
     split: str = Field("train", description="Split to load.")
-    text_key_chosen: str = Field("chosen", description="Column containing preferred response.")
-    text_key_rejected: str = Field("rejected", description="Column containing rejected response.")
+    text_key_chosen: str = Field(
+        "chosen", description="Column containing preferred response."
+    )
+    text_key_rejected: str = Field(
+        "rejected", description="Column containing rejected response."
+    )
 
 
 class RewardModelConfig(BaseModel):
@@ -51,19 +57,21 @@ class PostTrainingConfig(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @validator("output_dir")
-    def _ensure_output_dir(cls, value: Path) -> Path:
-        value.mkdir(parents=True, exist_ok=True)
-        return value
+    @model_validator(mode="after")
+    def _ensure_output_dir(self) -> PostTrainingConfig:
+        if self.output_dir is not None:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        return self
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         conf = OmegaConf.create(self.dict())
-        return OmegaConf.to_container(conf, resolve=True)  # type: ignore[return-value]
+        result = OmegaConf.to_container(conf, resolve=True)
+        return dict(result)  # type: ignore[arg-type]
 
     @classmethod
-    def from_file(cls, config_path: Path) -> "PostTrainingConfig":
+    def from_file(cls, config_path: Path) -> PostTrainingConfig:
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {config_path}")
         conf = OmegaConf.load(config_path)
         data = OmegaConf.to_container(conf, resolve=True)
-        return cls.parse_obj(data)
+        return cls.model_validate(data)

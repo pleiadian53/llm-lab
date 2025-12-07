@@ -3,26 +3,32 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class DataConfig(BaseModel):
     """Dataset configuration."""
 
-    dataset_name: str = Field("wikitext", description="Hugging Face dataset identifier.")
+    dataset_name: str = Field(
+        "wikitext", description="Hugging Face dataset identifier."
+    )
     dataset_config: str = Field("wikitext-2-raw-v1", description="Dataset config name.")
     text_column: str = Field("text", description="Column containing text data.")
-    streaming: bool = Field(False, description="Enable streaming mode for large datasets.")
+    streaming: bool = Field(
+        False, description="Enable streaming mode for large datasets."
+    )
 
 
 class ModelConfig(BaseModel):
     """Model definition."""
 
-    pretrained_model_name: str = Field("gpt2", description="Hugging Face model identifier.")
+    pretrained_model_name: str = Field(
+        "gpt2", description="Hugging Face model identifier."
+    )
     gradient_checkpointing: bool = Field(
         True, description="Enable gradient checkpointing for larger models."
     )
@@ -64,23 +70,25 @@ class PretrainingConfig(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @validator("output_dir")
-    def _ensure_output_dir(cls, value: Path) -> Path:
-        value.mkdir(parents=True, exist_ok=True)
-        return value
+    @model_validator(mode="after")
+    def _ensure_output_dir(self) -> PretrainingConfig:
+        if self.output_dir is not None:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        return self
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dict representation compatible with Hydra/OmegaConf."""
-        return OmegaConf.to_container(OmegaConf.create(self.dict()), resolve=True)  # type: ignore[return-value]
+        result = OmegaConf.to_container(OmegaConf.create(self.dict()), resolve=True)
+        return dict(result)  # type: ignore[arg-type]
 
     @classmethod
-    def from_file(cls, config_path: Path) -> "PretrainingConfig":
+    def from_file(cls, config_path: Path) -> PretrainingConfig:
         """Create a config from a YAML file."""
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {config_path}")
         conf = OmegaConf.load(config_path)
         data = OmegaConf.to_container(conf, resolve=True)
-        return cls.parse_obj(data)
+        return cls.model_validate(data)
 
     def instantiate(self, target: str, **overrides: Any) -> Any:
         """Instantiate a Hydra object using this configuration."""

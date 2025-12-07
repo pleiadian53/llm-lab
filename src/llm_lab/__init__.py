@@ -1,9 +1,12 @@
 """Top-level package for llm_lab."""
 
+from typing import Any
+
 from ._version import __version__
 
+
 # Lazy imports to avoid circular dependencies during installation
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name == "cli_app":
         from .cli import app
         return app

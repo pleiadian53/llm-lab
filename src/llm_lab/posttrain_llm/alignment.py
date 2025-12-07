@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from datasets import load_dataset
 
@@ -16,13 +16,13 @@ from llm_lab.posttrain_llm.evaluation import RewardModelEvaluator
 LOGGER = logging.getLogger(__name__)
 
 
-def _load_preferences(config: PostTrainingConfig) -> Iterable[dict]:
+def _load_preferences(config: PostTrainingConfig) -> Iterable[dict[Any, Any]]:
     try:
         dataset = load_dataset(
             config.dataset.dataset_name,
             split=config.dataset.split,
         )
-        return dataset
+        return dataset  # type: ignore[no-any-return]
     except Exception as exc:  # pragma: no cover - network dependent
         LOGGER.warning(
             "Falling back to synthetic preference dataset because load_dataset failed: %s",

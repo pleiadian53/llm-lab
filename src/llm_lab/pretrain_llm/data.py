@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Any, Iterable, List
 
 from datasets import IterableDataset, load_dataset
 from torch.utils.data import DataLoader, Dataset
@@ -37,7 +37,7 @@ class PretrainingDataModule:
     batch_size: int = 8
     max_seq_length: int = 256
 
-    def _load_dataset(self) -> Iterable[dict]:
+    def _load_dataset(self) -> Iterable[dict[Any, Any]]:
         try:
             dataset = load_dataset(
                 path=self.config.data.dataset_name,
@@ -46,8 +46,8 @@ class PretrainingDataModule:
                 streaming=self.config.data.streaming,
             )
             if isinstance(dataset, IterableDataset):
-                return dataset
-            return iter(dataset)
+                return dataset  # type: ignore[no-any-return]
+            return iter(dataset)  # type: ignore[no-any-return]
         except Exception as exc:  # pragma: no cover - network dependent
             LOGGER.warning(
                 "Falling back to synthetic dataset because load_dataset failed: %s", exc
@@ -69,12 +69,12 @@ class PretrainingDataModule:
             examples.append(encoded)
         return examples
 
-    def _collate(self, batch: List[List[int]]) -> dict:
-        return self.tokenizer.pad(
+    def _collate(self, batch: List[List[int]]) -> dict[Any, Any]:
+        return dict(self.tokenizer.pad(
             {"input_ids": batch},
             padding=True,
             return_tensors="pt",
-        )
+        ))
 
     def build_dataloader(self) -> DataLoader:
         """Create a torch DataLoader object."""

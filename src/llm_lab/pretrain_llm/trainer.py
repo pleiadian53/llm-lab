@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from itertools import cycle
-from typing import Iterable
+from typing import Iterator
 
 import torch
 from torch.optim import AdamW
@@ -60,7 +60,7 @@ class LanguageModelTrainer:
         torch.manual_seed(self.config.seed)
         optimizer = self._build_optimizer()
         dataloader = self.data_module.build_dataloader()
-        batches: Iterable = cycle(dataloader)
+        batches: Iterator = cycle(dataloader)
 
         for step in range(1, self.config.trainer.num_train_steps + 1):
             batch = next(batches)

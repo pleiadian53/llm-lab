@@ -29,15 +29,15 @@ class AutoregressiveLM:
         return cls(model=model, tokenizer=tokenizer)
 
     def to(self, device: torch.device) -> "AutoregressiveLM":
-        self.model.to(device)
+        self.model.to(device)  # type: ignore[arg-type]
         return self
 
     def generate(self, prompt: str, max_new_tokens: int = 64) -> str:
         encoded = self.tokenizer(prompt, return_tensors="pt")
         encoded = {k: v.to(self.model.device) for k, v in encoded.items()}
         with torch.no_grad():
-            outputs = self.model.generate(**encoded, max_new_tokens=max_new_tokens)
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            outputs = self.model.generate(**encoded, max_new_tokens=max_new_tokens)  # type: ignore[operator]
+        return str(self.tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         outputs = self.model(**batch, labels=batch["input_ids"])
