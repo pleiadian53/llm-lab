@@ -2,6 +2,10 @@
 
 This folder contains images and other assets referenced in the documentation.
 
+## Credits
+
+All slide images in this directory are from the **[Post-Training LLMs](https://www.deeplearning.ai/)** course by **DeepLearning.AI**. These materials are used for educational purposes only.
+
 ## Required Files
 
 - `reward_model_slide.png` — The "Reward Function in Online RL - Option 1: Trained Reward Model" slide showing the Bradley-Terry loss function.
