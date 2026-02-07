@@ -48,6 +48,7 @@ def load_model_and_tokenizer(
     token: Optional[str] = None,
 ) -> Tuple[PreTrainedModel, PreTrainedTokenizer]:
     """Load model and tokenizer with device support."""
+    # Resolve relative paths
     if model_name.startswith('./') or model_name.startswith('../'):
         model_name = os.path.abspath(model_name)
         print(f"Resolved local model path: {model_name}")

@@ -14,26 +14,28 @@ This tutorial provides a clear comparison of **on-policy** and **off-policy** re
 
 ### 1.1 On-Policy RL (e.g., SARSA)
 
-**Learn about the policy you are currently executing.**
+**The policy you evaluate is the same policy you use to collect data.**
 
-- The actions you *take* are the actions you *learn from*
-- You update values toward the **actual behavior policy**
-- Safer and more conservative, but sometimes slower to converge
+- The update target reflects the action *actually taken* under the current behavior policy
+- The learned value function tracks the performance of the *actual* policy — including any exploration noise (e.g., ε-greedy randomness)
+- Tends to be more conservative, because the value estimates account for the fact that the agent sometimes explores suboptimally
 
 ### 1.2 Off-Policy RL (e.g., Q-learning)
 
-**Learn about a different policy than the one you execute.**
+**The policy you evaluate (the *target* policy) differs from the policy you use to collect data (the *behavior* policy).**
 
-- You can follow an exploratory policy (e.g., ε-greedy)
-- But learn a value function for a **greedy/optimal policy**
-- More powerful, but potentially less stable
+- The update target uses a *different* action-selection rule than the one that generated the data — in Q-learning, the update always uses the greedy $\max$ action, even if the agent took a random exploratory action
+- This means the learned value function reflects the performance of the *optimal* policy, not the exploratory behavior policy
+- More sample-efficient in principle (can learn from any data source), but the mismatch between target and behavior policies can cause instability, especially with function approximation
+
+> **Common misconception:** Using an ε-greedy behavior policy is *not* what makes Q-learning off-policy. SARSA can also use ε-greedy exploration. The distinction is in the **update rule**: Q-learning bootstraps from $\max_{a'} Q(s', a')$ (the target policy), while SARSA bootstraps from $Q(s', a')$ where $a'$ is the action actually taken (the behavior policy).
 
 ### 1.3 Quick Comparison
 
-| Type | Learns Value Of | Behaves According To |
-|------|-----------------|----------------------|
-| **On-policy (SARSA)** | The behavior policy | The same policy |
-| **Off-policy (Q-learning)** | The optimal greedy policy | A more exploratory policy |
+| Type | Update Target Uses | Learns Value Of | Behavior Policy |
+|------|-------------------|-----------------|----------------|
+| **On-policy (SARSA)** | Action actually taken ($a'$ from behavior policy) | The behavior policy (including exploration) | Same as target policy |
+| **Off-policy (Q-learning)** | Best action ($\max_{a'} Q$, from target policy) | The optimal greedy policy | Can differ from target policy |
 
 ---
 
@@ -58,7 +60,7 @@ where:
 | $s'$ | Next state |
 | $a'$ | **Actual next action taken** (sampled from behavior policy) |
 
-**Key point:** The update uses $a'$, the action *you really took* according to your current policy. This means SARSA tracks the value of your *current behavior*, including exploration.
+**Key point:** The update bootstraps from $Q(s', a')$, where $a'$ is the action *actually sampled* from the current behavior policy. This means SARSA's value estimates reflect the true performance of the policy being followed — including the cost of occasional random exploration.
 
 ### 2.2 Q-Learning (Off-Policy)
 
@@ -66,82 +68,83 @@ Q-learning updates using the *best possible action* next:
 
 $$Q(s, a) \leftarrow Q(s, a) + \alpha \left[ r + \gamma \max_{a'} Q(s', a') - Q(s, a) \right]$$
 
-**Key point:** The update uses $\max_{a'} Q(s', a')$, the greedy action, regardless of what action was actually taken. This means Q-learning learns the value of the *optimal policy*, even if you behaved suboptimally during exploration.
+**Key point:** The update bootstraps from $\max_{a'} Q(s', a')$ — the value of the *greedy* action — regardless of what action the agent actually took next. This is precisely what makes Q-learning off-policy: the **target policy** (greedy) differs from the **behavior policy** (e.g., ε-greedy). The agent learns the value of acting optimally, even while behaving exploratorily.
 
 ### 2.3 Side-by-Side Comparison
 
-| Aspect | SARSA | Q-Learning |
-|--------|-------|------------|
+| Aspect | SARSA (On-Policy) | Q-Learning (Off-Policy) |
+|--------|-------------------|-------------------------|
 | **Update target** | $r + \gamma Q(s', a')$ | $r + \gamma \max_{a'} Q(s', a')$ |
-| **Next action** | Actual action taken | Best possible action |
-| **Policy learned** | Behavior policy | Optimal policy |
+| **$a'$ in the target** | Sampled from behavior policy | Greedy (best action), regardless of what was taken |
+| **Policy learned** | The behavior policy (with exploration) | The optimal greedy policy |
+| **Why on/off-policy?** | Target and behavior policy are the same | Target policy (greedy) ≠ behavior policy (exploratory) |
 
 ---
 
 ## 3. A Concrete Example: The Cliff Walking Problem
 
-Consider navigating a gridworld with a **dangerous shortcut** — a path along a cliff that offers high reward but risks falling off with large negative penalties.
+This classic example from Sutton & Barto (2018, Example 6.6) makes the on/off-policy distinction viscerally clear.
+
+**Setup:** An agent navigates a gridworld from Start to Goal. The bottom row contains a cliff — stepping on any cliff cell gives a large negative reward ($-100$) and resets the agent to Start. All other moves give $-1$. There are two routes: a **safe path** along the top (longer, but no risk) and an **optimal path** along the bottom edge (shorter, but one misstep sends you off the cliff).
 
 ### 3.1 SARSA (On-Policy) Behavior
 
-If your behavior is ε-greedy (occasionally random), SARSA learns:
+SARSA learns the value of the policy it actually follows. With ε-greedy exploration, the agent occasionally takes random actions. Near the cliff edge, a random action can be fatal. SARSA's value estimates *incorporate* this risk:
 
-> "If I follow an ε-greedy policy, taking this path is risky because I might accidentally fall into the bad state."
+> "Walking along the cliff edge is dangerous *for me*, because I sometimes explore randomly and fall off."
 
-**Result:** SARSA becomes **risk-averse** and learns to avoid the shortcut, taking the safer but longer path.
+**Result:** SARSA learns to take the **safe path** — it stays far from the cliff because its value estimates honestly reflect the cost of its own exploration mistakes.
 
 ### 3.2 Q-Learning (Off-Policy) Behavior
 
-Q-learning assumes:
+Q-learning learns the value of the *optimal* (greedy) policy, regardless of the exploratory behavior. The greedy policy would never step off the cliff, so Q-learning's value estimates ignore the exploration risk:
 
-> "I evaluate the action as if I always take the greedy optimal path — even though I sometimes explore."
+> "The cliff-edge path is optimal *if I always act greedily* — the fact that I sometimes explore is irrelevant to my value estimates."
 
-**Result:** Q-learning becomes **risk-seeking** and learns that the shortcut is optimal in expectation, ignoring the exploration noise.
+**Result:** Q-learning learns that the **optimal path** runs along the cliff edge. But during training, the agent actually *does* explore and repeatedly falls off the cliff, leading to worse online performance despite learning the theoretically optimal policy.
 
 ### 3.3 Why This Matters
 
-| Algorithm | Risk Profile | Reason |
-|-----------|--------------|--------|
-| **SARSA** | Risk-averse | Accounts for exploration in value estimates |
-| **Q-learning** | Risk-seeking | Assumes optimal behavior in value estimates |
+| Algorithm | Learned Path | Online Performance | Reason |
+|-----------|-------------|-------------------|--------|
+| **SARSA** | Safe (away from cliff) | Better during training | Value estimates account for exploration risk |
+| **Q-learning** | Optimal (along cliff edge) | Worse during training | Value estimates assume greedy behavior |
 
-This is the classic "cliff walking" example from Sutton & Barto's RL textbook.
+This illustrates a fundamental trade-off: on-policy methods learn *realistic* values (what will actually happen), while off-policy methods learn *idealized* values (what would happen under optimal behavior). Neither is universally better — it depends on whether you care about performance *during* learning or performance *after* learning (once exploration stops).
 
 ---
 
 ## 4. Connection to LLM Training (RLHF/RLAIF)
 
-Modern LLM training with reinforcement learning has strong connections to off-policy learning.
+Modern LLM training with reinforcement learning has interesting connections to both on-policy and off-policy concepts. The picture is more nuanced than a simple classification.
 
-### 4.1 Why RLHF is Fundamentally Off-Policy
+### 4.1 The On-Policy Core
 
-In RLHF/RLAIF:
+The most common RLHF algorithm, **PPO** (Proximal Policy Optimization), is fundamentally an **on-policy** method:
 
-- The **reward model** changes over time (updated with new preferences)
-- Policies change every iteration
-- Exploratory rollouts are required for diverse training data
-- Evaluation uses a *different* reward model (fresh RM or verifiers)
-- The goal is to learn an **improved policy**, not reinforce the behavior that produced the data
+- Each training iteration generates **fresh rollouts** from the current policy
+- The policy update uses these on-policy samples (with a clipped surrogate objective)
+- Old rollouts are discarded after each update
 
-This is fundamentally **off-policy**:
+In this sense, the inner loop of RLHF is on-policy — just like SARSA learns from its own behavior, PPO learns from the current policy's outputs.
 
-> **Train on data generated by old policies → Evaluate on a new, often improved, reward function.**
+### 4.2 The Off-Policy Complications
 
-### 4.2 Implications
+However, several aspects of the RLHF pipeline introduce **off-policy-like challenges**:
+
+- **Reward model drift:** The reward model is trained on human preferences collected from *earlier* policy versions. As the policy improves, the reward model may become stale or miscalibrated for the new policy's outputs.
+- **Distribution shift:** Even within a single PPO iteration, the policy changes over multiple gradient steps while the rollout data stays fixed — a mild form of off-policy learning.
+- **Evaluation mismatch:** The policy is often evaluated using a *different* reward signal than the one used during training (e.g., a held-out reward model, human evaluators, or automated verifiers).
+
+### 4.3 Implications for Evaluation
 
 | Aspect | Implication |
 |--------|-------------|
-| **No fixed validation set** | Evaluation depends on a different reward function |
-| **Distribution shift** | Training data comes from older policy versions |
-| **Reward hacking risk** | On-policy methods could overfit to the reward model |
+| **Reward model staleness** | The RM may not accurately score the improved policy's outputs |
+| **Distribution shift** | Training data comes from a slightly older policy version |
+| **Evaluation protocol** | Final evaluation should use a *separate* reward signal (fresh RM, verifiers, or human judges) to avoid overfitting to the training RM |
 
-### 4.3 Connection to RL-Test
-
-This is why evaluation in RLHF uses:
-
-> Reward from a **new RM + verifiers** (instead of validating on the reward used during RL training)
-
-This mirrors off-policy evaluation in classical RL, where we evaluate a target policy using data collected by a different behavior policy.
+This last point mirrors **off-policy evaluation** in classical RL: we want to assess a target policy (the trained LLM) using a reward signal that is independent of the training process. Just as Q-learning evaluates the greedy policy using data from an exploratory policy, RLHF evaluation assesses the final policy using a reward model it wasn't directly optimized against.
 
 ---
 
@@ -153,29 +156,30 @@ This mirrors off-policy evaluation in classical RL, where we evaluate a target p
 |--------|-------------------|-------------------------|
 | **Learns value of** | Behavior policy | Optimal policy |
 | **Updates with** | Actual next action $a'$ | Greedy next action $\max_{a'}$ |
-| **Exploration impact** | Reflected in updates | Not reflected |
-| **Stability** | More stable | Less stable |
-| **Risk behavior** | Risk-averse | Risk-seeking |
-| **LLM RL (RLHF/RLAIF)?** | ❌ Rarely used | ✅ Conceptually similar |
+| **Exploration impact** | Reflected in value estimates | Not reflected in value estimates |
+| **Stability** | Generally more stable (no target–behavior mismatch) | Can diverge with function approximation (the "deadly triad") |
+| **Risk behavior** | Risk-averse (accounts for exploration mistakes) | Risk-neutral w.r.t. exploration (assumes greedy execution) |
+| **LLM RL (RLHF)** | PPO (the most common RLHF algorithm) is on-policy | Off-policy *concepts* apply to evaluation and reward model drift |
 
 ### 5.2 When to Use Which
 
-| Scenario | Recommended |
-|----------|-------------|
-| Safety-critical environments | On-policy (SARSA) |
-| Learning optimal behavior | Off-policy (Q-learning) |
-| Using replay buffers | Off-policy |
-| LLM fine-tuning (RLHF) | Off-policy concepts |
+| Scenario | Recommended | Why |
+|----------|-------------|-----|
+| Safety-critical environments | On-policy | Value estimates reflect actual behavior, including exploration risk |
+| Learning optimal behavior from diverse data | Off-policy | Can learn from replay buffers, demonstrations, or other policies |
+| Experience replay / replay buffers | Off-policy | Data was collected by older policies |
+| LLM fine-tuning (RLHF) | On-policy (PPO), with off-policy evaluation | Fresh rollouts for training; separate reward signal for evaluation |
 
 ---
 
 ## 6. Further Topics
 
-- Visual diagrams comparing SARSA vs Q-learning
-- Python code implementing both algorithms
+- Visual diagrams comparing SARSA vs Q-learning update paths
+- Python implementation of both algorithms on the cliff walking problem
+- The "deadly triad" — why off-policy + function approximation + bootstrapping can diverge
 - Connection to PPO, GRPO, DPO, and post-training in modern LLMs
-- Why PPO (used in RLHF) is "kind-of" on-policy but used in an off-policy setting
-- How evaluation in RLHF is analogous to off-policy evaluation in classical RL
+- Importance sampling and its role in bridging on-policy and off-policy methods
+- How off-policy evaluation techniques apply to RLHF evaluation protocols
 
 ---
 
